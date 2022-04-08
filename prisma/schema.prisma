@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String          @id @default(uuid())
+  email                 String          @unique
+  discriminator         String          @db.VarChar(4)
+  username              String
+  password              String
+  verified              Boolean         @default(false)
+  telephone             String?
+  avatar                String?         @db.Text
+  status                UserStatus      @default(ONLINE)
+  color                 String          @default("#69564e")
+  banner                String?         @db.Text
+  aboutMe               String?         @db.VarChar(190)
+  friends               User[]          @relation("friends")
+  friendsRelation       User[]          @relation("friends")
+  blocked               User[]          @relation("blocked")
+  blockedRelation       User[]          @relation("blocked")
+  outgoingFriendRequest FriendRequest[] @relation("OutgoingRequest")
+  incomingFriendRequest FriendRequest[] @relation("IncomingRequest")
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  reactions             Reaction[]
+  sentMessages          Message[]       @relation("SendMessages")
+  serverMember          ServerMember[]
+  mentions              Message[]       @relation(references: [id])
+  DM                    DM[]            @relation("DMs")
+  visibleDM             DM[]            @relation("VisibleDMs")
+  readMessages          Message[]       @relation("ReadMessages")
+}
+
+model FriendRequest {
+  id          Int           @id @default(autoincrement())
+  requester   User          @relation("OutgoingRequest", fields: [requesterId], references: [id])
+  requesterId String
+  recipient   User          @relation("IncomingRequest", fields: [recipientId], references: [id])
+  recipientId String
+  status      RequestStatus @default(PENDING)
+  requestedAt DateTime      @default(now())
+}
+
+model DM {
+  id              String    @id @default(uuid())
+  type            DMType    @default(ONE_TO_ONE)
+  recipients      User[]    @relation("DMs")
+  visibility      User[]    @relation("VisibleDMs")
+  lastMessageDate DateTime?
+  messages        Message[]
+  createdAt       DateTime  @default(now())
+}
+
+model Message {
+  id              String     @id @default(uuid())
+  sender          User       @relation("SendMessages", fields: [senderId], references: [id])
+  senderId        String
+  edited          Boolean    @default(false)
+  content         String     @db.Text
+  images          Image[]
+  readBy          User[]     @relation("ReadMessages")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  reactions       Reaction[]
+  channel         Channel?   @relation(fields: [channelId], references: [id])
+  channelId       String?
+  mentions        User[]
+  parentMessage   Message?   @relation("ReplyToMessage", fields: [parentMessageId], references: [id])
+  parentMessageId String?
+  replies         Message[]  @relation("ReplyToMessage")
+  DM              DM?        @relation(fields: [dmId], references: [id])
+  dmId            String?
+}
+
+model Image {
+  id        String  @id @default(uuid())
+  url       String  @db.Text
+  message   Message @relation(fields: [messageId], references: [id])
+  messageId String
+}
+
+model Reaction {
+  id        String  @id @default(uuid())
+  count     Int     @default(1)
+  content   String
+  message   Message @relation(fields: [messageId], references: [id])
+  users     User[]
+  messageId String
+}
+
+model Server {
+  id          String         @id @default(uuid())
+  name        String
+  invitations Invitation[]
+  members     ServerMember[]
+  roles       Role[]
+  categories  Category[]
+}
+
+model Invitation {
+  code           String   @id
+  uses           Int      @default(0)
+  createdAt      DateTime @default(now())
+  expirationDate DateTime
+  server         Server   @relation(fields: [serverId], references: [id])
+  serverId       String
+}
+
+model Role {
+  id       String         @id @default(uuid())
+  name     String
+  color    String         @default("#99aab5")
+  icon     String?        @db.Text
+  server   Server         @relation(fields: [serverId], references: [id])
+  serverId String
+  members  ServerMember[]
+}
+
+model ServerMember {
+  id       String   @id @default(uuid())
+  user     User     @relation(fields: [userId], references: [id])
+  userId   String
+  server   Server   @relation(fields: [serverId], references: [id])
+  serverId String
+  nick     String?
+  roles    Role[]
+  mute     Boolean  @default(false)
+  joinedAt DateTime @default(now())
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String
+  server   Server    @relation(fields: [serverId], references: [id])
+  serverId String
+  channel  Channel[]
+}
+
+model Channel {
+  id         String      @id @default(uuid())
+  type       ChannelType @default(TEXT)
+  name       String
+  private    Boolean     @default(false)
+  nsfw       Boolean     @default(false)
+  position   Int
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  messages   Message[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+enum RequestStatus {
+  PENDING
+  REJECTED
+  ACCEPTED
+}
+
+enum UserStatus {
+  ONLINE
+  IDLE
+  DO_NOT_DISTURB
+  INVISIBLE
+}
+
+enum ChannelType {
+  TEXT
+  VOICE
+}
+
+enum DMType {
+  GROUP
+  ONE_TO_ONE
+}
